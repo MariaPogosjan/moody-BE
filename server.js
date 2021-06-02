@@ -60,6 +60,10 @@ const userSchema = mongoose.Schema({
   accessToken: {
     type: String,
     default: () => crypto.randomBytes(128).toString('hex')
+  },
+  profileImage: {
+    name: String,
+    imageURL: String
   }
 })
 
@@ -124,10 +128,19 @@ app.post('/sessions', async (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
-app.post('/avatars', parser.single('image'), async (req, res) => {
-  res.json({
-    imageUrl: req.file.path, imageId: req.file.filename
-  })
+app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
+  const { id } = req.params
+  try {
+    const avatar = await User.findByIdAndUpdate(id,
+      { profileImage: { name: req.file.filename, imageURL: req.file.path } }, { new: true })
+    if (avatar) {
+      res.json(avatar.profileImage)
+    } else {
+      res.status(404).json({ message: 'Could not update picture' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
 })
 
 // Start the server
