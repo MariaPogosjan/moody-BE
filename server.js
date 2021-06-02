@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 /* eslint-disable no-useless-escape */
 import express from 'express'
 import cors from 'cors'
@@ -39,6 +40,7 @@ const userSchema = mongoose.Schema({
     minlength: 5,
     maxlength: 12,
     unique: true,
+    lowercase: true,
     trim: true
   },
   email: {
@@ -68,6 +70,20 @@ const userSchema = mongoose.Schema({
 })
 
 const User = mongoose.model('User', userSchema)
+
+const authanticateUser = async (req, res, next) => {
+  const accessToken = req.header('Authorization')
+  try {
+    const user = await User.findOne({ accessToken })
+    if (user) {
+      next()
+    } else {
+      res.status(401).json({ sucess: false, message: 'Not authorized' })
+    }
+  } catch (error) {
+    res.status(400).json({ sucess: false, message: 'Invalid request', error })
+  }
+}
 
 const port = process.env.PORT || 8080
 const app = express()
@@ -101,6 +117,63 @@ app.post('/users', async (req, res) => {
       message: 'Could not create user',
       error
     })
+  }
+})
+
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $unset: [
+          "password",
+          "accessToken",
+          "email"
+        ]
+      }
+    ])
+    res.json(users)
+  } catch (error) {
+    res.status(400).json(error)
+  }
+})
+
+app.delete('/users/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const deletedUser = await User.findByIdAndDelete(id)
+    if (deletedUser) {
+      res.json(deletedUser)
+    } else {
+      res.status(404).json('Could not delete the user')
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.patch('/users/:id', async (req, res) => {
+  const { id } = req.params
+  const { email, username, password } = req.body
+  try {
+    const updatedUser = await User.findByIdAndUpdate(id,
+      {
+        $set: {
+          username,
+          email,
+          password
+        }
+      },
+      {
+        new: true
+      })
+    res.json({
+      success: true,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      id: updatedUser._id
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
 
