@@ -66,16 +66,38 @@ const userSchema = mongoose.Schema({
   profileImage: {
     name: String,
     imageURL: String
-  }
+  },
+  feelings: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Feeling'
+    }
+  ]
 })
 
 const User = mongoose.model('User', userSchema)
+
+const feelingSchema = mongoose.Schema({
+  value: Number,
+  description: String,
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+})
+
+const Feeling = mongoose.model('Feeling', feelingSchema)
 
 const authanticateUser = async (req, res, next) => {
   const accessToken = req.header('Authorization')
   try {
     const user = await User.findOne({ accessToken })
     if (user) {
+      req.user = user
       next()
     } else {
       res.status(401).json({ sucess: false, message: 'Not authorized' })
@@ -134,6 +156,26 @@ app.get('/users', async (req, res) => {
     res.json(users)
   } catch (error) {
     res.status(400).json(error)
+  }
+})
+
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const foundUser = await User.findById(id).populate('feelings')
+    if (foundUser) {
+      res.json({
+        success: true,
+        id: foundUser._id,
+        username: foundUser.username,
+        email: foundUser.email,
+        feelings: foundUser.feelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'User not found' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
   }
 })
 
@@ -213,6 +255,40 @@ app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
     }
   } catch (error) {
     res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.post('/feelings', authanticateUser)
+app.post('/feelings', async (req, res) => {
+  const { value, description } = req.body
+  const { _id } = req.user
+
+  try {
+    const user = await User.findById(_id)
+    const newFeeling = await new Feeling({
+      user: user._id,
+      value,
+      description
+    }).save()
+    const updatedUser = await User.findOneAndUpdate(
+      { _id },
+      { $push: { feelings: newFeeling } },
+      { new: true }
+    )
+    res.status(201).json(
+      {
+        feeling: {
+          value: newFeeling.value,
+          description: newFeeling.description,
+          user: newFeeling.user
+        },
+        userFeelings: {
+          feelings: updatedUser.feelings
+        }
+      }
+    )
+  } catch (error) {
+    res.status(404).json({ message: 'Bad request', error })
   }
 })
 
