@@ -275,18 +275,23 @@ app.post('/feelings', async (req, res) => {
       { $push: { feelings: newFeeling } },
       { new: true }
     )
-    res.status(201).json(
-      {
-        feeling: {
-          value: newFeeling.value,
-          description: newFeeling.description,
-          user: newFeeling.user
-        },
-        userFeelings: {
-          feelings: updatedUser.feelings
+    if (newFeeling && updatedUser) {
+      res.status(201).json(
+        {
+          success: true,
+          feeling: {
+            value: newFeeling.value,
+            description: newFeeling.description,
+            user: newFeeling.user
+          },
+          userFeelings: {
+            feelings: updatedUser.feelings
+          }
         }
-      }
-    )
+      )
+    } else {
+      res.status(404).json({ message: 'Could not register feeling' })
+    }
   } catch (error) {
     res.status(404).json({ message: 'Bad request', error })
   }
