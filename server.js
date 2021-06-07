@@ -66,13 +66,7 @@ const userSchema = mongoose.Schema({
   profileImage: {
     name: String,
     imageURL: String
-  },
-  feelings: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Feeling'
-    }
-  ]
+  }
 })
 
 const User = mongoose.model('User', userSchema)
@@ -162,17 +156,35 @@ app.get('/users', async (req, res) => {
 app.get('/users/:id', async (req, res) => {
   const { id } = req.params
   try {
-    const foundUser = await User.findById(id).populate('feelings')
+    const foundUser = await User.findById(id)
     if (foundUser) {
       res.json({
         success: true,
         id: foundUser._id,
         username: foundUser.username,
-        email: foundUser.email,
-        feelings: foundUser.feelings
+        email: foundUser.email
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.get('/feelings/:id', authanticateUser)
+app.get('/feelings/:id', async (req, res) => {
+  const { _id } = req.user
+
+  try {
+    const foundFeelings = await Feeling.find({ user: _id })
+    if (foundFeelings) {
+      res.json({
+        success: true,
+        feelings: foundFeelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not find users feelings' })
     }
   } catch (error) {
     res.status(400).json({ message: 'Invalid request', error })
@@ -266,16 +278,11 @@ app.post('/feelings', async (req, res) => {
   try {
     const user = await User.findById(_id)
     const newFeeling = await new Feeling({
-      user: user._id,
+      user,
       value,
       description
     }).save()
-    const updatedUser = await User.findOneAndUpdate(
-      { _id },
-      { $push: { feelings: newFeeling } },
-      { new: true }
-    )
-    if (newFeeling && updatedUser) {
+    if (newFeeling) {
       res.status(201).json(
         {
           success: true,
@@ -283,9 +290,6 @@ app.post('/feelings', async (req, res) => {
             value: newFeeling.value,
             description: newFeeling.description,
             user: newFeeling.user
-          },
-          userFeelings: {
-            feelings: updatedUser.feelings
           }
         }
       )
