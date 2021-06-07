@@ -289,7 +289,7 @@ app.post('/feelings', async (req, res) => {
           feeling: {
             value: newFeeling.value,
             description: newFeeling.description,
-            user: newFeeling.user
+            user: newFeeling.user._id
           }
         }
       )
