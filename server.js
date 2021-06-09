@@ -311,12 +311,12 @@ app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
     const avatar = await User.findByIdAndUpdate(id,
       { profileImage: { name: req.file.filename, imageURL: req.file.path } }, { new: true })
     if (avatar) {
-      res.json(avatar.profileImage)
+      res.json({ sucess: true, profileImage: avatar.profileImage })
     } else {
-      res.status(404).json({ message: 'Could not update picture' })
+      res.status(404).json({ sucess: false, message: 'Could not update picture' })
     }
   } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
+    res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
 
