@@ -125,7 +125,8 @@ app.post('/users', async (req, res) => {
       // eslint-disable-next-line no-underscore-dangle
       userId: newUser._id,
       username: newUser.username,
-      accessToken: newUser.accessToken
+      accessToken: newUser.accessToken,
+      profileImage: newUser.profileImage
     })
   } catch (error) {
     res.status(400).json({
@@ -293,7 +294,8 @@ app.post('/sessions', async (req, res) => {
         // eslint-disable-next-line no-underscore-dangle
         userId: user._id,
         username: user.username,
-        accessToken: user.accessToken
+        accessToken: user.accessToken,
+        profileImage: user.profileImage
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
