@@ -125,7 +125,8 @@ app.post('/users', async (req, res) => {
       // eslint-disable-next-line no-underscore-dangle
       userId: newUser._id,
       username: newUser.username,
-      accessToken: newUser.accessToken
+      accessToken: newUser.accessToken,
+      profileImage: newUser.profileImage
     })
   } catch (error) {
     res.status(400).json({
