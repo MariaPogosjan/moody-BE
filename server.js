@@ -205,16 +205,14 @@ app.delete('/users/:id', async (req, res) => {
   }
 })
 
-app.patch('/users/:id', async (req, res) => {
+app.patch('/users/:id/email', authanticateUser, async (req, res) => {
   const { id } = req.params
-  const { email, username, password } = req.body
+  const { email } = req.body
   try {
     const updatedUser = await User.findByIdAndUpdate(id,
       {
         $set: {
-          username,
-          email,
-          password
+          email
         }
       },
       {
@@ -222,10 +220,59 @@ app.patch('/users/:id', async (req, res) => {
       })
     res.json({
       success: true,
-      username: updatedUser.username,
-      email: updatedUser.email,
-      id: updatedUser._id
+      email: updatedUser.email
     })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/users/:id/username', authanticateUser, async (req, res) => {
+  const { id } = req.params
+  const { username } = req.body
+  try {
+    const updatedUser = await User.findByIdAndUpdate(id,
+      {
+        $set: {
+          username
+        }
+      },
+      {
+        new: true
+      })
+    res.json({
+      success: true,
+      username: updatedUser.username
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/users/:id/password', authanticateUser, async (req, res) => {
+  const { id } = req.params
+  const { password, newPassword } = req.body
+  try {
+    const salt = bcrypt.genSaltSync()
+    const user = await User.findById(id)
+
+    if (user && bcrypt.compareSync(password, user.password)) {
+      const updatedUser = await User.findByIdAndUpdate(id,
+        {
+          $set: {
+            password: bcrypt.hashSync(newPassword, salt)
+          }
+        },
+        {
+          new: true
+        })
+      res.json({
+        success: true,
+        message: `${updatedUser.username}: password updated successfully!`
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not update password!' })
+    }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
@@ -255,6 +302,7 @@ app.post('/sessions', async (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
+
 app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
   const { id } = req.params
   try {
@@ -301,7 +349,7 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
-// Start the server
+// Start the server here
 app.listen(port, () => {
   // eslint-disable-next-line
   console.log(`Server running on http://localhost:${port}`)
