@@ -349,7 +349,7 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
-// Start the server
+// Start the server here
 app.listen(port, () => {
   // eslint-disable-next-line
   console.log(`Server running on http://localhost:${port}`)
