@@ -1,5 +1,3 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable no-useless-escape */
 import express from 'express'
 import cors from 'cors'
 import mongoose from 'mongoose'
