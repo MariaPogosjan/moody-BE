@@ -174,8 +174,10 @@ app.get('/users/:id', async (req, res) => {
         id: foundUser._id,
         username: foundUser.username,
         email: foundUser.email,
-        followers: foundUser.followers,
-        following: foundUser.following
+        friends: foundUser.friends,
+        friendRequests: foundUser.friendRequests,
+        myFriendRequests: foundUser.myFriendRequests
+       
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -387,8 +389,8 @@ app.put('/follow', authanticateUser, async (req, res) => {
           myFriendRequests: id
         }
       }, {
-      new: true
-    })
+        new: true
+      })
 
     if (friendRequest && myFriendRequest) {
       res.json({ success: true, message: `You have requested to be friends with ${friendRequest._id}` })
