@@ -371,7 +371,6 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
-
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
@@ -386,8 +385,8 @@ app.put('/follow', authanticateUser, async (req, res) => {
           friendRequests: _id
         }
       }, {
-      new: true
-    })
+        new: true
+      })
 
     const myFriendRequest = await User.findByIdAndUpdate(_id,
       {
@@ -399,7 +398,11 @@ app.put('/follow', authanticateUser, async (req, res) => {
       })
 
     if (friendRequest && myFriendRequest) {
-      res.json({ success: true, message: `You have requested to be friends with ${friendRequest._id}` })
+      res.json({ 
+        success: true, 
+        id: friendRequest._id,
+        message: `You have requested to be friends with ${friendRequest.username}` 
+      })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not request friendship!' })
     }
@@ -451,7 +454,10 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
         new: true
       })
     if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
-      res.json({ success: true, message: `You are now friend with ${myFriendAdded._id}` })
+      res.json({ 
+        success: true, 
+        id: myFriendAdded._id,
+        message: `You are now friend with ${myFriendAdded.username}` })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
@@ -482,13 +488,15 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
     })
 
     if (unfollowedFriend && meRemoved) {
-      res.json({ success: true, message: `You are now NOT friend with ${unfollowedFriend._id}` })
+      res.json({ 
+        success: true, 
+        id: unfollowedFriend._id,
+        message: `You are now NOT friend with ${unfollowedFriend.username}` })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
-
 
 // Start the server here
 app.listen(port, () => {
