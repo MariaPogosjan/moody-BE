@@ -1,5 +1,3 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable no-useless-escape */
 import express from 'express'
 import cors from 'cors'
 import mongoose from 'mongoose'
@@ -66,7 +64,19 @@ const userSchema = mongoose.Schema({
   profileImage: {
     name: String,
     imageURL: String
-  }
+  },
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  friendRequests: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  myFriendRequests: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 })
 
 const User = mongoose.model('User', userSchema)
@@ -163,7 +173,9 @@ app.get('/users/:id', async (req, res) => {
         success: true,
         id: foundUser._id,
         username: foundUser.username,
-        email: foundUser.email
+        email: foundUser.email,
+        followers: foundUser.followers,
+        following: foundUser.following
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -350,6 +362,125 @@ app.post('/feelings', async (req, res) => {
     res.status(404).json({ message: 'Bad request', error })
   }
 })
+
+
+// request a friend 
+app.put('/follow', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  // eslint-disable-next-line no-console
+  try {
+    const friendRequest = await User.findByIdAndUpdate(id,
+      {
+        $push: {
+          // eslint-disable-next-line no-undef
+          friendRequests: _id
+        }
+      }, {
+      new: true
+    })
+
+    const myFriendRequest = await User.findByIdAndUpdate(_id,
+      {
+        $push: {
+          myFriendRequests: id
+        }
+      }, {
+      new: true
+    })
+
+    if (friendRequest && myFriendRequest) {
+      res.json({ success: true, message: `You have requested to be friends with ${friendRequest._id}` })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not request friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.put('/acceptfriends', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+    const myFriendAdded = await User.findByIdAndUpdate(id,
+      {
+        $push: {
+          // eslint-disable-next-line no-undef
+          friends: _id
+        }
+      },
+      {
+        new: true
+      })
+    const myFriendRemoved = await User.findByIdAndUpdate(id,
+      {
+        $pull: {
+          friendRequests: _id
+        }
+      },
+      {
+        new: true
+      })
+    const meAdded = await User.findByIdAndUpdate(_id,
+      {
+        $push: {
+          friends: id
+        }
+      },
+      {
+        new: true
+      })
+    const meRemoved = await User.findByIdAndUpdate(_id,
+      {
+        $pull: {
+          friends: id
+        }
+      },
+      {
+        new: true
+      })
+    if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
+      res.json({ success: true, message: `You are now friend with ${myFriendAdded._id}` })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/unfollow', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+    const unfollowedFriend = await User.findByIdAndUpdate(id, {
+      $pull: {
+        friends: _id
+      }
+    }, {
+      new: true
+    })
+
+    const meRemoved = await User.findByIdAndUpdate(_id, {
+      $pull: {
+        friends: id
+      }
+    }, {
+      new: true
+    })
+
+    if (unfollowedFriend && meRemoved) {
+      res.json({ success: true, message: `You are now NOT friend with ${unfollowedFriend._id}` })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
 
 // Start the server here
 app.listen(port, () => {
