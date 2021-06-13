@@ -363,6 +363,7 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
+
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
@@ -479,6 +480,7 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
+
 
 // Start the server here
 app.listen(port, () => {
