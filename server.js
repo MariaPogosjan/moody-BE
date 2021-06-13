@@ -12,7 +12,7 @@ import cloudinaryStorage from 'multer-storage-cloudinary'
 dotenv.config()
 const cloudinary = cloudinaryFramework.v2;
 cloudinary.config({
-  cloud_name: 'doxvkrxqc',
+  cloud_name: 'drfog5fha',
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 })
@@ -64,7 +64,19 @@ const userSchema = mongoose.Schema({
   profileImage: {
     name: String,
     imageURL: String
-  }
+  },
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  friendRequests: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  myFriendRequests: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 })
 
 const User = mongoose.model('User', userSchema)
@@ -123,7 +135,8 @@ app.post('/users', async (req, res) => {
       // eslint-disable-next-line no-underscore-dangle
       userId: newUser._id,
       username: newUser.username,
-      accessToken: newUser.accessToken
+      accessToken: newUser.accessToken,
+      profileImage: newUser.profileImage
     })
   } catch (error) {
     res.status(400).json({
@@ -160,7 +173,9 @@ app.get('/users/:id', async (req, res) => {
         success: true,
         id: foundUser._id,
         username: foundUser.username,
-        email: foundUser.email
+        email: foundUser.email,
+        followers: foundUser.followers,
+        following: foundUser.following
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -203,16 +218,14 @@ app.delete('/users/:id', async (req, res) => {
   }
 })
 
-app.patch('/users/:id', async (req, res) => {
+app.patch('/users/:id/email', authanticateUser, async (req, res) => {
   const { id } = req.params
-  const { email, username, password } = req.body
+  const { email } = req.body
   try {
     const updatedUser = await User.findByIdAndUpdate(id,
       {
         $set: {
-          username,
-          email,
-          password
+          email
         }
       },
       {
@@ -220,10 +233,59 @@ app.patch('/users/:id', async (req, res) => {
       })
     res.json({
       success: true,
-      username: updatedUser.username,
-      email: updatedUser.email,
-      id: updatedUser._id
+      email: updatedUser.email
     })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/users/:id/username', authanticateUser, async (req, res) => {
+  const { id } = req.params
+  const { username } = req.body
+  try {
+    const updatedUser = await User.findByIdAndUpdate(id,
+      {
+        $set: {
+          username
+        }
+      },
+      {
+        new: true
+      })
+    res.json({
+      success: true,
+      username: updatedUser.username
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/users/:id/password', authanticateUser, async (req, res) => {
+  const { id } = req.params
+  const { password, newPassword } = req.body
+  try {
+    const salt = bcrypt.genSaltSync()
+    const user = await User.findById(id)
+
+    if (user && bcrypt.compareSync(password, user.password)) {
+      const updatedUser = await User.findByIdAndUpdate(id,
+        {
+          $set: {
+            password: bcrypt.hashSync(newPassword, salt)
+          }
+        },
+        {
+          new: true
+        })
+      res.json({
+        success: true,
+        message: `${updatedUser.username}: password updated successfully!`
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not update password!' })
+    }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
@@ -244,7 +306,8 @@ app.post('/sessions', async (req, res) => {
         // eslint-disable-next-line no-underscore-dangle
         userId: user._id,
         username: user.username,
-        accessToken: user.accessToken
+        accessToken: user.accessToken,
+        profileImage: user.profileImage
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -253,18 +316,19 @@ app.post('/sessions', async (req, res) => {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
+
 app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
   const { id } = req.params
   try {
     const avatar = await User.findByIdAndUpdate(id,
       { profileImage: { name: req.file.filename, imageURL: req.file.path } }, { new: true })
     if (avatar) {
-      res.json(avatar.profileImage)
+      res.json({ sucess: true, profileImage: avatar.profileImage })
     } else {
-      res.status(404).json({ message: 'Could not update picture' })
+      res.status(404).json({ sucess: false, message: 'Could not update picture' })
     }
   } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
+    res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
 
@@ -299,7 +363,124 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
-// Start the server
+// request a friend 
+app.put('/follow', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  // eslint-disable-next-line no-console
+  try {
+    const friendRequest = await User.findByIdAndUpdate(id,
+      {
+        $push: {
+          // eslint-disable-next-line no-undef
+          friendRequests: _id
+        }
+      }, {
+      new: true
+    })
+
+    const myFriendRequest = await User.findByIdAndUpdate(_id,
+      {
+        $push: {
+          myFriendRequests: id
+        }
+      }, {
+      new: true
+    })
+
+    if (friendRequest && myFriendRequest) {
+      res.json({ success: true, message: `You have requested to be friends with ${friendRequest._id}` })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not request friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.put('/acceptfriends', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+    const myFriendAdded = await User.findByIdAndUpdate(id,
+      {
+        $push: {
+          // eslint-disable-next-line no-undef
+          friends: _id
+        }
+      },
+      {
+        new: true
+      })
+    const myFriendRemoved = await User.findByIdAndUpdate(id,
+      {
+        $pull: {
+          friendRequests: _id
+        }
+      },
+      {
+        new: true
+      })
+    const meAdded = await User.findByIdAndUpdate(_id,
+      {
+        $push: {
+          friends: id
+        }
+      },
+      {
+        new: true
+      })
+    const meRemoved = await User.findByIdAndUpdate(_id,
+      {
+        $pull: {
+          friends: id
+        }
+      },
+      {
+        new: true
+      })
+    if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
+      res.json({ success: true, message: `You are now friend with ${myFriendAdded._id}` })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/unfollow', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+    const unfollowedFriend = await User.findByIdAndUpdate(id, {
+      $pull: {
+        friends: _id
+      }
+    }, {
+      new: true
+    })
+
+    const meRemoved = await User.findByIdAndUpdate(_id, {
+      $pull: {
+        friends: id
+      }
+    }, {
+      new: true
+    })
+
+    if (unfollowedFriend && meRemoved) {
+      res.json({ success: true, message: `You are now NOT friend with ${unfollowedFriend._id}` })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+// Start the server here
 app.listen(port, () => {
   // eslint-disable-next-line
   console.log(`Server running on http://localhost:${port}`)
