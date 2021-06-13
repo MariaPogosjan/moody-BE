@@ -136,7 +136,10 @@ app.post('/users', async (req, res) => {
       userId: newUser._id,
       username: newUser.username,
       accessToken: newUser.accessToken,
-      profileImage: newUser.profileImage
+      profileImage: newUser.profileImage,
+      friends: newUser.friends,
+      friendRequests: newUser.friendRequests,
+      myFriendRequests: newUser.myFriendRequests
     })
   } catch (error) {
     res.status(400).json({
@@ -309,7 +312,10 @@ app.post('/sessions', async (req, res) => {
         userId: user._id,
         username: user.username,
         accessToken: user.accessToken,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        friends: user.friends,
+        friendRequests: user.friendRequests,
+        myFriendRequests: user.myFriendRequests
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
