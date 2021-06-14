@@ -414,7 +414,11 @@ app.put('/follow', authanticateUser, async (req, res) => {
     if (friendRequest && myFriendRequest) {
       res.json({ 
         success: true, 
-        id: friendRequest._id,
+        friend: {
+          id: friendRequest._id,
+          username: friendRequest.username,
+          profileImage: friendRequest.profileImage
+        },
         message: `You have requested to be friends with ${friendRequest.username}` 
       })
     } else {
@@ -473,7 +477,11 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
     if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
       res.json({ 
         success: true, 
-        id: myFriendAdded._id,
+        friend: {
+          id: myFriendAdded._id,
+          username: myFriendAdded.username,
+          profileImage: myFriendAdded.profileImage
+        },
         message: `You are now friend with ${myFriendAdded.username}` })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
@@ -507,7 +515,11 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
     if (unfollowedFriend && meRemoved) {
       res.json({ 
         success: true, 
-        id: unfollowedFriend._id,
+        friend: {
+          id: unfollowedFriend._id,
+          username: unfollowedFriend.username,
+          profileImage: unfollowedFriend.profileImage
+        },
         message: `You are now NOT friend with ${unfollowedFriend.username}` })
     }
   } catch (error) {
