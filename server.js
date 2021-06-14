@@ -461,12 +461,15 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
     const meRemoved = await User.findByIdAndUpdate(_id,
       {
         $pull: {
-          friends: id
+          friendRequests: id
         }
       },
       {
         new: true
       })
+
+    console.log('Test', meAdded)
+  
     if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
       res.json({ 
         success: true, 
