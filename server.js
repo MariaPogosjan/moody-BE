@@ -171,11 +171,17 @@ app.get('/users/:id', async (req, res) => {
   const { id } = req.params
   try {
     const foundUser = await User.findById(id)
+      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'friends', select: ['username', 'profileImage'] })
+      .exec()
+      
     if (foundUser) {
       res.json({
         success: true,
         id: foundUser._id,
         username: foundUser.username,
+        profileImage: foundUser.profileImage,
         email: foundUser.email,
         friends: foundUser.friends,
         friendRequests: foundUser.friendRequests,
