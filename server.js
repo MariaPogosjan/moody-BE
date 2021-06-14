@@ -415,7 +415,7 @@ app.put('/follow', authanticateUser, async (req, res) => {
       res.json({ 
         success: true, 
         friend: {
-          id: friendRequest._id,
+          _id: friendRequest._id,
           username: friendRequest.username,
           profileImage: friendRequest.profileImage
         },
@@ -472,13 +472,11 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
         new: true
       })
 
-    console.log('Test', meAdded)
-  
     if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
       res.json({ 
         success: true, 
         friend: {
-          id: myFriendAdded._id,
+          _id: myFriendAdded._id,
           username: myFriendAdded.username,
           profileImage: myFriendAdded.profileImage
         },
@@ -516,7 +514,7 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
       res.json({ 
         success: true, 
         friend: {
-          id: unfollowedFriend._id,
+          _id: unfollowedFriend._id,
           username: unfollowedFriend.username,
           profileImage: unfollowedFriend.profileImage
         },
