@@ -157,6 +157,10 @@ app.get('/users', async (req, res) => {
         $unset: [
           "password",
           "accessToken",
+          "feelings",
+          "friends",
+          "friendRequests",
+          "myFriendRequests",
           "email"
         ]
       }
@@ -175,7 +179,7 @@ app.get('/users/:id', async (req, res) => {
       .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
       .populate({ path: 'friends', select: ['username', 'profileImage'] })
       .exec()
-      
+
     if (foundUser) {
       res.json({
         success: true,
