@@ -315,6 +315,10 @@ app.post('/sessions', async (req, res) => {
         { username: emailOrUsername }
       ]
     })
+      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'friends', select: ['username', 'profileImage'] })
+      .exec()
     if (user && bcrypt.compareSync(password, user.password)) {
       res.json({
         success: true,
