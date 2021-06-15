@@ -7,6 +7,8 @@ import bcrypt from 'bcrypt'
 import dotenv from 'dotenv'
 import cloudinaryFramework from 'cloudinary'
 import multer from 'multer'
+import http from 'http'
+import socketIo from 'socket.io'
 import cloudinaryStorage from 'multer-storage-cloudinary'
 
 dotenv.config()
@@ -113,6 +115,27 @@ const authanticateUser = async (req, res, next) => {
 
 const port = process.env.PORT || 8080
 const app = express()
+const server = http.createServer(app)
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  } 
+})
+
+const getApiAndEmit = async (socket) => {
+  const user = await User.find()
+  socket.emit("FromAPI", user)
+}
+
+io.on("connection", (socket) => {
+  console.log("New client connected")
+  // setInterval(() => getApiAndEmit(socket), 1000)
+  getApiAndEmit(socket)
+  socket.on("disconnect", () => {
+    console.log("Client disconnected")
+  })
+})
 
 app.use(cors())
 app.use(express.json())
@@ -526,7 +549,7 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
 })
 
 // Start the server here
-app.listen(port, () => {
+server.listen(port, () => {
   // eslint-disable-next-line
   console.log(`Server running on http://localhost:${port}`)
 })
