@@ -219,6 +219,24 @@ app.get('/feelings/:id', async (req, res) => {
   }
 })
 
+app.get('/friendfeeling/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const foundFeelings = await Feeling.find({ user: id })
+    if (foundFeelings) {
+      res.json({
+        success: true,
+        feelings: foundFeelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not find users feelings' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
 app.delete('/users/:id', async (req, res) => {
   const { id } = req.params
   try {
