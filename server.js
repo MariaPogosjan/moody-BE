@@ -506,7 +506,6 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
   }
 })
 
-
 app.put('/denyfriends', authanticateUser, async (req, res) => {
   const { id } = req.body
   const { _id } = req.user
