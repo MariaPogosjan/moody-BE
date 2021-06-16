@@ -513,7 +513,7 @@ app.post('/feelings', async (req, res) => {
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
-  const { _id } = req.user
+  const { _id } = req.user 
 
   // eslint-disable-next-line no-console
   try {
@@ -559,7 +559,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
   const { _id } = req.user
 
   try {
-    const myFriendAdded = await User.findByIdAndUpdate(id,
+    const meAddedToFriend = await User.findByIdAndUpdate(id,
       {
         $push: {
           // eslint-disable-next-line no-undef
@@ -569,16 +569,16 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const myFriendRemoved = await User.findByIdAndUpdate(id,
+    const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
       {
         $pull: {
-          friendRequests: _id
+          myFriendRequests: _id
         }
       },
       {
         new: true
       })
-    const meAdded = await User.findByIdAndUpdate(_id,
+    const friendAddedAsFriend = await User.findByIdAndUpdate(_id,
       {
         $push: {
           friends: id
@@ -587,7 +587,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const meRemoved = await User.findByIdAndUpdate(_id,
+    const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
       {
         $pull: {
           friendRequests: id
@@ -596,17 +596,58 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-
-    if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
-      res.json({
-        success: true,
+    if (meAddedToFriend && meRemovedFromFriendRequest && friendAddedAsFriend && friendRemovedFromMyRequest) {
+      res.json({ 
+        success: true, 
         friend: {
-          _id: myFriendAdded._id,
-          username: myFriendAdded.username,
-          profileImage: myFriendAdded.profileImage
+          _id: meAddedToFriend._id,
+          username: meAddedToFriend.username,
+          profileImage: meAddedToFriend.profileImage
         },
-        message: `You are now friend with ${myFriendAdded.username}`
+        message: `You are now friend with ${meAddedToFriend.username}` })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+
+app.put('/denyfriends', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+
+    const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
+      {
+        $pull: {
+          myFriendRequests: _id
+        }
+      },
+      {
+        new: true
       })
+    const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
+      {
+        $pull: {
+          friendRequests: id
+        }
+      },
+      {
+        new: true
+      })
+    if (meRemovedFromFriendRequest && friendRemovedFromMyRequest) {
+      res.json({ 
+        success: true, 
+        friend: {
+          _id: meRemovedFromFriendRequest._id,
+          username: meRemovedFromFriendRequest.username,
+          profileImage: meRemovedFromFriendRequest.profileImage
+        },
+        message: `You denied friendship with ${meRemovedFromFriendRequest.username}` })
+
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
