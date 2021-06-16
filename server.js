@@ -405,8 +405,8 @@ app.post('/feelings', async (req, res) => {
 
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
-  const { id } = req.body
-  const { _id } = req.user
+  const { id } = req.body // Friend
+  const { _id } = req.user // Me 
 
   // eslint-disable-next-line no-console
   try {
@@ -448,11 +448,12 @@ app.put('/follow', authanticateUser, async (req, res) => {
 })
 
 app.put('/acceptfriends', authanticateUser, async (req, res) => {
-  const { id } = req.body
-  const { _id } = req.user
+  const { id } = req.body // friend 
+  const { _id } = req.user // ME 
 
   try {
-    const myFriendAdded = await User.findByIdAndUpdate(id,
+    // I accept friend 
+    const meAddedToFriend = await User.findByIdAndUpdate(id,
       {
         $push: {
           // eslint-disable-next-line no-undef
@@ -462,7 +463,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const myFriendRemoved = await User.findByIdAndUpdate(id,
+    const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
       {
         $pull: {
           friendRequests: _id
@@ -471,7 +472,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const meAdded = await User.findByIdAndUpdate(_id,
+    const friendAddedAsFriend = await User.findByIdAndUpdate(_id,
       {
         $push: {
           friends: id
@@ -480,7 +481,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const meRemoved = await User.findByIdAndUpdate(_id,
+    const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
       {
         $pull: {
           myFriendRequests: id
@@ -489,16 +490,15 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-
-    if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
+    if (meAddedToFriend && meRemovedFromFriendRequest && friendAddedAsFriend && friendRemovedFromMyRequest) {
       res.json({ 
         success: true, 
         friend: {
-          _id: myFriendAdded._id,
-          username: myFriendAdded.username,
-          profileImage: myFriendAdded.profileImage
+          _id: meAddedToFriend._id,
+          username: meAddedToFriend.username,
+          profileImage: meAddedToFriend.profileImage
         },
-        message: `You are now friend with ${myFriendAdded.username}` })
+        message: `You are now friend with ${meAddedToFriend.username}` })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
