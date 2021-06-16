@@ -96,6 +96,47 @@ const feelingSchema = mongoose.Schema({
 
 const Feeling = mongoose.model('Feeling', feelingSchema)
 
+const thoughtSchema = mongoose.Schema({
+  message: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 5,
+    maxlength: 140
+  },
+  hugs: {
+    type: Number,
+    default: 0
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  comments: [{
+    message: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 5,
+      maxlength: 140
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }]
+})
+
+const Thought = mongoose.model('Thought', thoughtSchema)
+
 const authanticateUser = async (req, res, next) => {
   const accessToken = req.header('Authorization')
   try {
@@ -119,6 +160,72 @@ app.use(express.json())
 
 app.get('/', (req, res) => {
   res.send(listEndpoints(app))
+})
+
+// Thought Endspoints starts here 
+app.get('/thoughts', async (req, res) => {
+  try {
+    const thoughts = await Thought.find()
+    res.json({ success: true, thoughts })
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.post('/thoughts', authanticateUser, async (req, res) => {
+  const { message } = req.body
+  const { _id } = req.user
+
+  try {
+    const newThought = await new Thought({
+      message,
+      user: _id
+    }).save()
+    if (newThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: newThought._id,
+          message: newThought.message,
+          createdAt: newThought.createdAt,
+          user: newThought.user,
+          hugs: newThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not post thought' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/like', async (req, res) => {
+  const { thoughtId } = req.params
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate(
+      { _id: thoughtId },
+      { $inc: { hugs: 1 } },
+      { new: true }
+    )
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not like post' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
 })
 
 app.post('/users', async (req, res) => {
@@ -190,7 +297,7 @@ app.get('/users/:id', async (req, res) => {
         friends: foundUser.friends,
         friendRequests: foundUser.friendRequests,
         myFriendRequests: foundUser.myFriendRequests
-       
+
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -417,8 +524,8 @@ app.put('/follow', authanticateUser, async (req, res) => {
           friendRequests: _id
         }
       }, {
-        new: true
-      })
+      new: true
+    })
 
     const myFriendRequest = await User.findByIdAndUpdate(_id,
       {
@@ -426,18 +533,18 @@ app.put('/follow', authanticateUser, async (req, res) => {
           myFriendRequests: id
         }
       }, {
-        new: true
-      })
+      new: true
+    })
 
     if (friendRequest && myFriendRequest) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         friend: {
           _id: friendRequest._id,
           username: friendRequest.username,
           profileImage: friendRequest.profileImage
         },
-        message: `You have requested to be friends with ${friendRequest.username}` 
+        message: `You have requested to be friends with ${friendRequest.username}`
       })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not request friendship!' })
@@ -506,6 +613,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
   }
 })
 
+
 app.put('/denyfriends', authanticateUser, async (req, res) => {
   const { id } = req.body
   const { _id } = req.user
@@ -539,6 +647,7 @@ app.put('/denyfriends', authanticateUser, async (req, res) => {
           profileImage: meRemovedFromFriendRequest.profileImage
         },
         message: `You denied friendship with ${meRemovedFromFriendRequest.username}` })
+
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
@@ -569,14 +678,15 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
     })
 
     if (unfollowedFriend && meRemoved) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         friend: {
           _id: unfollowedFriend._id,
           username: unfollowedFriend.username,
           profileImage: unfollowedFriend.profileImage
         },
-        message: `You are now NOT friend with ${unfollowedFriend.username}` })
+        message: `You are now NOT friend with ${unfollowedFriend.username}`
+      })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
