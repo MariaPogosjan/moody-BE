@@ -483,7 +483,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
     const meRemoved = await User.findByIdAndUpdate(_id,
       {
         $pull: {
-          friendRequests: id
+          myFriendRequests: id
         }
       },
       {
