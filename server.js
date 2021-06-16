@@ -466,7 +466,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
     const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
       {
         $pull: {
-          friendRequests: _id
+          myFriendRequests: _id
         }
       },
       {
@@ -484,7 +484,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
     const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
       {
         $pull: {
-          myFriendRequests: id
+          friendRequests: id
         }
       },
       {
