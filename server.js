@@ -118,24 +118,34 @@ const app = express()
 const server = http.createServer(app)
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: "*"
   } 
 })
 
-const getApiAndEmit = async (socket) => {
+/* const getApiAndEmit = async (socket) => {
   const user = await User.find()
   socket.emit("FromAPI", user)
 }
-
-io.on("connection", (socket) => {
-  console.log("New client connected")
+ */
+io.on('connection', (socket) => {
+  console.log("User connected: ", socket.id)
   // setInterval(() => getApiAndEmit(socket), 1000)
-  getApiAndEmit(socket)
+  // getApiAndEmit(socket)
+
+  socket.on('room', (room) => {
+    // eslint-disable-next-line no-console
+    console.log('Server message is here: ', room)
+    socket.join(room)
+    io.in(room).emit('message', 'what is going on, party people?')
+  })
+
   socket.on("disconnect", () => {
-    console.log("Client disconnected")
+    console.log("Client disconnected", socket.id)
   })
 })
+
+//const room = "abc123"
+//io.in(room).emit('message', 'what is going on, party people?');
 
 app.use(cors())
 app.use(express.json())
