@@ -208,9 +208,7 @@ app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => 
   const { _id } = req.user
 
   try {
-    const updatedThought = await Thought.findByIdAndUpdate({
-      _id: thoughtId
-    }, {
+    const updatedThought = await Thought.findByIdAndUpdate(thoughtId, {
       $push: {
         comment,
         user: _id
