@@ -171,12 +171,12 @@ app.get('/thoughts', async (req, res) => {
   try {
     const thoughts = await Thought
       .find()
+      .populate({ path: 'user', select: ['username', 'profileImage'] })
+      .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
       .sort({ createdAt: 'desc' })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .exec()
-      .populate({ path: 'user', select: ['username', 'profileImage'] })
-      .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
     res.json({ 
       success: true, 
       thoughts,
