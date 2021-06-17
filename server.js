@@ -164,8 +164,15 @@ app.get('/', (req, res) => {
 
 // Thought Endspoints starts here 
 app.get('/thoughts', async (req, res) => {
+  const { page, perPage } = req.query
+
   try {
-    const thoughts = await Thought.find()
+    const thoughts = await Thought
+      .find()
+      .sort({ createdAt: 'desc' })
+      .skip(((Number(page) - 1) * Number(perPage)))
+      .limit(Number(perPage))
+      .exec()
       .populate({ path: 'user', select: ['username', 'profileImage'] })
       .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
     res.json({ success: true, thoughts })
