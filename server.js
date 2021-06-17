@@ -164,18 +164,25 @@ app.get('/', (req, res) => {
 
 // Thought Endspoints starts here 
 app.get('/thoughts', async (req, res) => {
-  const { page, perPage } = req.query
+  const { page = 1, perPage = 20 } = req.query
+
+  const countAllThoughts = await Thought.countDocuments() 
 
   try {
     const thoughts = await Thought
       .find()
       .sort({ createdAt: 'desc' })
-      .skip(((Number(page) - 1) * Number(perPage)))
-      .limit(Number(perPage))
+      .skip((page - 1) * perPage)
+      .limit(perPage)
       .exec()
       .populate({ path: 'user', select: ['username', 'profileImage'] })
       .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
-    res.json({ success: true, thoughts })
+    res.json({ 
+      success: true, 
+      thoughts,
+      totalPages: Math.ceil(countAllThoughts / perPage),
+      currenPage: page
+    })
   } catch (error) {
     res.status(400).json({ message: 'Invalid request', error })
   }
