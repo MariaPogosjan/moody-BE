@@ -167,7 +167,7 @@ app.get('/thoughts', async (req, res) => {
   try {
     const thoughts = await Thought.find()
       .populate({ path: 'user', select: ['username', 'profileImage'] })
-      .populate({ path: 'comments', select: ['username'] })
+      .populate({ path: 'comments', select: ['user'] })
     res.json({ success: true, thoughts })
   } catch (error) {
     res.status(400).json({ message: 'Invalid request', error })
