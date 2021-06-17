@@ -122,30 +122,27 @@ const io = socketIo(server, {
   } 
 })
 
-/* const getApiAndEmit = async (socket) => {
-  const user = await User.find()
-  socket.emit("FromAPI", user)
-}
- */
-io.on('connection', (socket) => {
+io.sockets.on('connection', (socket) => {
   console.log("User connected: ", socket.id)
-  // setInterval(() => getApiAndEmit(socket), 1000)
-  // getApiAndEmit(socket)
-
-  socket.on('room', (room) => {
+ 
+  socket.on('join room', (data) => {
+    socket.join(data.room)
     // eslint-disable-next-line no-console
-    console.log('Server message is here: ', room)
-    socket.join(room)
-    io.in(room).emit('message', 'what is going on, party people?')
+    console.log('joined room ', data.room)
   })
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected", socket.id)
+  socket.on('orderCompleted', (data) => {
+    socket.to(data.room).emit('notifyStore', data)
+  }) 
+
+  socket.emit('join room', {
+    room: 500
+  })
+
+  socket.on('end', () => {
+    socket.disconnect(0);
   })
 })
-
-//const room = "abc123"
-//io.in(room).emit('message', 'what is going on, party people?');
 
 app.use(cors())
 app.use(express.json())
