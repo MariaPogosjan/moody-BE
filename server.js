@@ -117,7 +117,7 @@ const thoughtSchema = mongoose.Schema({
     default: Date.now
   },
   comments: [{
-    message: {
+    comment: {
       type: String,
       required: true,
       trim: true,
@@ -166,6 +166,8 @@ app.get('/', (req, res) => {
 app.get('/thoughts', async (req, res) => {
   try {
     const thoughts = await Thought.find()
+      .populate({ path: 'user', select: ['username', 'profileImage'] })
+      .populate({ path: 'comments', select: ['username'] })
     res.json({ success: true, thoughts })
   } catch (error) {
     res.status(400).json({ message: 'Invalid request', error })
@@ -200,7 +202,42 @@ app.post('/thoughts', authanticateUser, async (req, res) => {
   }
 })
 
-app.patch('/thoughts/:thoughtId/like', async (req, res) => {
+app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => {
+  const { thoughtId } = req.params
+  const { comment } = req.body
+  const { _id } = req.user
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate({
+      _id: thoughtId
+    }, {
+      $push: {
+        comment,
+        user: _id
+      }
+    }, {
+      new: true
+    }) 
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not comment post' })
+    }
+  } catch (error) {
+    res.status(400).json({ succes: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/hug', async (req, res) => {
   const { thoughtId } = req.params
 
   try {
@@ -513,7 +550,7 @@ app.post('/feelings', async (req, res) => {
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
-  const { _id } = req.user 
+  const { _id } = req.user
 
   // eslint-disable-next-line no-console
   try {
@@ -597,14 +634,15 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
         new: true
       })
     if (meAddedToFriend && meRemovedFromFriendRequest && friendAddedAsFriend && friendRemovedFromMyRequest) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         friend: {
           _id: meAddedToFriend._id,
           username: meAddedToFriend.username,
           profileImage: meAddedToFriend.profileImage
         },
-        message: `You are now friend with ${meAddedToFriend.username}` })
+        message: `You are now friend with ${meAddedToFriend.username}`
+      })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
@@ -639,14 +677,15 @@ app.put('/denyfriends', authanticateUser, async (req, res) => {
         new: true
       })
     if (meRemovedFromFriendRequest && friendRemovedFromMyRequest) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         friend: {
           _id: meRemovedFromFriendRequest._id,
           username: meRemovedFromFriendRequest.username,
           profileImage: meRemovedFromFriendRequest.profileImage
         },
-        message: `You denied friendship with ${meRemovedFromFriendRequest.username}` })
+        message: `You denied friendship with ${meRemovedFromFriendRequest.username}`
+      })
 
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
