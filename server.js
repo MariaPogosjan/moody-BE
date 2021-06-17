@@ -113,39 +113,67 @@ const authanticateUser = async (req, res, next) => {
   }
 }
 
+const NEW_MESSAGE_EVENT = "new-message-event"
+
 const port = process.env.PORT || 8080
 const app = express()
 const server = http.createServer(app)
 const io = socketIo(server, {
   cors: {
     origin: "*"
-  } 
-})
-
-io.sockets.on('connection', (socket) => {
-  console.log("User connected: ", socket.id)
- 
-  socket.on('join room', (data) => {
-    socket.join(data.room)
-    // eslint-disable-next-line no-console
-    console.log('joined room ', data.room)
-  })
-
-  socket.on('orderCompleted', (data) => {
-    socket.to(data.room).emit('notifyStore', data)
-  }) 
-
-  socket.emit('join room', {
-    room: 500
-  })
-
-  socket.on('end', () => {
-    socket.disconnect(0);
-  })
+  }  
+  /* cors: true, 
+  origins: ["localhost:3000"] */
 })
 
 app.use(cors())
 app.use(express.json())
+
+const room = "general"
+
+/* io.on('connection', (socket) => {
+  socket.join(room)
+
+  socket.on(NEW_MESSAGE_EVENT, (data) => {
+    io.in(room).emit(NEW_MESSAGE_EVENT, data)
+  })
+
+  socket.on("disconnect", () => {
+    socket.leave(room);
+  })
+})
+ */
+
+const users = []
+
+io.on('connection', (socket) => {
+  console.log("User connected: ", socket.id)
+ 
+  socket.on('join room', (data) => {
+    socket.join(data.room)
+    users.push(data)
+    console.log(users)
+    // eslint-disable-next-line no-console
+    console.log('joined room ', data.room)
+  })
+
+  socket.socket.on('test', (data) => {
+    socket.emit('notifyAboutFollow', data)
+  })
+
+  //socket.socket.get(data.socketId).emit('notifyAboutFollow', data);
+
+ /*  socket.on('orderCompleted', (data) => {
+    socket.to(data.room).emit('notifyStore', data)
+  })  */
+  socket.on('end', () => {
+    socket.disconnect(0);
+  })
+}) 
+
+/* io.sockets.on('4001', (socket) => {
+  socket.emit('notifyAboutFollow', users.data);
+}) */
 
 app.get('/', (req, res) => {
   res.send(listEndpoints(app))
