@@ -113,8 +113,6 @@ const authanticateUser = async (req, res, next) => {
   }
 }
 
-const NEW_MESSAGE_EVENT = "new-message-event"
-
 const port = process.env.PORT || 8080
 const app = express()
 const server = http.createServer(app)
@@ -122,14 +120,65 @@ const io = socketIo(server, {
   cors: {
     origin: "*"
   }  
-  /* cors: true, 
-  origins: ["localhost:3000"] */
+})
+
+let users = []
+
+const addUser = (userId, socketId) => {
+  // eslint-disable-next-line array-callback-return
+  // eslint-disable-next-line no-unused-expressions
+  if (!users.some((user) => user === userId)) {
+    users.push({ userId, socketId })
+  }
+}
+
+// eslint-disable-next-line no-irregular-whitespace
+const removeUser = (socketId) => {
+  users = users.filter((user) => user.socketId !== socketId)
+}
+
+const getUser = (userId) => {
+  //console.log('141 userId: ', userId)
+  // eslint-disable-next-line array-callback-return
+  const test = users.filter((user) => {
+    // eslint-disable-next-line no-irregular-whitespace
+    userId.reciverId.filter((item) =>  item === user)
+  })
+  console.log('test', test)
+}
+
+io.on("connection", (socket) => {
+  // When users are connect 
+  // console.log('user here', socket.id)
+
+  // Take userID and socketId from user 
+  socket.on("addUser", (userId) => {
+    addUser(userId, socket.id)
+    io.emit("getUsers", users)
+    // console.log(users)
+  }) 
+
+  // send and get message 
+  socket.on("sendMessage", (receiverId) => {
+    console.log('här?', receiverId)
+    const user = getUser(receiverId) // WHY NOT WORKING? 
+    console.log('user här?', user)
+   
+    io.to(user).emit("alert", receiverId)  
+  })
+
+  // When users disconnect  
+  socket.on("disconnect", () => {
+    // console.log('Disconnected')
+    removeUser(socket.id)
+    io.emit("getUsers", users)
+  })
 })
 
 app.use(cors())
 app.use(express.json())
 
-const room = "general"
+//
 
 /* io.on('connection', (socket) => {
   socket.join(room)
@@ -144,6 +193,7 @@ const room = "general"
 })
  */
 
+/*
 const users = []
 
 io.on('connection', (socket) => {
@@ -161,17 +211,17 @@ io.on('connection', (socket) => {
     socket.emit('notifyAboutFollow', data)
   })
 
-  //socket.socket.get(data.socketId).emit('notifyAboutFollow', data);
+  socket.socket.get(data.socketId).emit('notifyAboutFollow', data);
 
- /*  socket.on('orderCompleted', (data) => {
+  socket.on('orderCompleted', (data) => {
     socket.to(data.room).emit('notifyStore', data)
-  })  */
+  }) 
   socket.on('end', () => {
     socket.disconnect(0);
   })
 }) 
 
-/* io.sockets.on('4001', (socket) => {
+ io.sockets.on('4001', (socket) => {
   socket.emit('notifyAboutFollow', users.data);
 }) */
 
