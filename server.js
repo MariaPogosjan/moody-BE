@@ -8,6 +8,8 @@ import dotenv from 'dotenv'
 import cloudinaryFramework from 'cloudinary'
 import multer from 'multer'
 import cloudinaryStorage from 'multer-storage-cloudinary'
+import http from 'http'
+import socketIo from 'socket.io'
 
 dotenv.config()
 const cloudinary = cloudinaryFramework.v2;
@@ -157,6 +159,26 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
+const server = http.createServer(app)
+const io = socketIo(server, {
+  cors: {
+    origin: "*"
+  }  
+})
+
+io.on("connection", (socket) => {
+  console.log("Made socket connection", socket.id)
+
+  socket.on("disconnect", () => {
+    console.log("Made socket disconnected")
+  })
+
+  socket.on("sendnotification", (data) => {
+    // data.username.map((item) => item.username)
+    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username));
+  })
+})
+
 
 app.get('/', (req, res) => {
   res.send(listEndpoints(app))
