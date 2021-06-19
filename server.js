@@ -122,58 +122,71 @@ const io = socketIo(server, {
   }  
 })
 
-let users = []
-
-const addUser = (userId, socketId) => {
-  // eslint-disable-next-line array-callback-return
-  // eslint-disable-next-line no-unused-expressions
-  if (!users.some((user) => user === userId)) {
-    users.push({ userId, socketId })
-  }
-}
-
-// eslint-disable-next-line no-irregular-whitespace
-const removeUser = (socketId) => {
-  users = users.filter((user) => user.socketId !== socketId)
-}
-
-const getUser = (userId) => {
-  //console.log('141 userId: ', userId)
-  // eslint-disable-next-line array-callback-return
-  const test = users.filter((user) => {
-    // eslint-disable-next-line no-irregular-whitespace
-    userId.reciverId.filter((item) =>  item === user)
-  })
-  console.log('test', test)
-}
-
 io.on("connection", (socket) => {
-  // When users are connect 
-  // console.log('user here', socket.id)
+  console.log("Made socket connection", socket.id)
 
-  // Take userID and socketId from user 
-  socket.on("addUser", (userId) => {
-    addUser(userId, socket.id)
-    io.emit("getUsers", users)
-    // console.log(users)
-  }) 
-
-  // send and get message 
-  socket.on("sendMessage", (receiverId) => {
-    console.log('här?', receiverId)
-    const user = getUser(receiverId) // WHY NOT WORKING? 
-    console.log('user här?', user)
-   
-    io.to(user).emit("alert", receiverId)  
+  socket.on("disconnect", () => {
+    console.log("Made socket disconnected")
   })
 
-  // When users disconnect  
-  socket.on("disconnect", () => {
-    // console.log('Disconnected')
-    removeUser(socket.id)
-    io.emit("getUsers", users)
+  socket.on("sendnotification", (data) => {
+    // data.username.map((item) => item.username)
+    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username));
   })
 })
+
+// let users = []
+
+// const addUser = (userId, socketId) => {
+//   // eslint-disable-next-line array-callback-return
+//   // eslint-disable-next-line no-unused-expressions
+//   if (!users.some((user) => user === userId)) {
+//     users.push({ userId, socketId })
+//   }
+// }
+
+// // eslint-disable-next-line no-irregular-whitespace
+// const removeUser = (socketId) => {
+//   users = users.filter((user) => user.socketId !== socketId)
+// }
+
+// const getUser = (userId) => {
+//   //console.log('141 userId: ', userId)
+//   // eslint-disable-next-line array-callback-return
+//   const test = users.filter((user) => {
+//     // eslint-disable-next-line no-irregular-whitespace
+//     userId.reciverId.filter((item) =>  item === user)
+//   })
+//   console.log('test', test)
+// }
+
+// io.on("connection", (socket) => {
+//   // When users are connect 
+//   // console.log('user here', socket.id)
+
+//   // Take userID and socketId from user 
+//   socket.on("addUser", (userId) => {
+//     addUser(userId, socket.id)
+//     io.emit("getUsers", users)
+//     // console.log(users)
+//   }) 
+
+//   // send and get message 
+//   socket.on("sendMessage", (receiverId) => {
+//     console.log('här?', receiverId)
+//     const user = getUser(receiverId) // WHY NOT WORKING? 
+//     console.log('user här?', user)
+   
+//     io.to(user).emit("alert", receiverId)  
+//   })
+
+//   // When users disconnect  
+//   socket.on("disconnect", () => {
+//     // console.log('Disconnected')
+//     removeUser(socket.id)
+//     io.emit("getUsers", users)
+//   })
+// })
 
 app.use(cors())
 app.use(express.json())
