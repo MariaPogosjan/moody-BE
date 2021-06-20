@@ -5,18 +5,22 @@ import express from 'express'
 import cors from 'cors'
 import mongoose from 'mongoose'
 import listEndpoints from 'express-list-endpoints'
-import crypto from 'crypto'
 import bcrypt from 'bcrypt'
 import dotenv from 'dotenv'
 import cloudinaryFramework from 'cloudinary'
 import multer from 'multer'
 import cloudinaryStorage from 'multer-storage-cloudinary'
-
 import { OAuth2Client } from 'google-auth-library'
 
-const client = new OAuth2Client(process.env.GOOGLE_KEY)
+import { userSchema } from './Schemas/user'
+import { feelingSchema } from './Schemas/feeling'
+import { thoughtSchema } from './Schemas/thought'
 
 dotenv.config()
+/*  Setting up google Authentication client  */
+const client = new OAuth2Client(process.env.GOOGLE_KEY)
+
+/*  Setting up cloudinary for profile img  */
 const cloudinary = cloudinaryFramework.v2;
 cloudinary.config({
   cloud_name: 'drfog5fha',
@@ -32,116 +36,16 @@ const storage = cloudinaryStorage({
     transformation: [{ width: 500, height: 500, crop: 'limit' }]
   }
 })
+
 const parser = multer({ storage })
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/moody"
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true })
 mongoose.Promise = Promise
 
-const userSchema = mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    minlength: 5,
-    maxlength: 35,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    validate: {
-      validator: (value) => {
-        return /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/.test(value)
-      },
-      message: 'Please enter a valid email address'
-    }
-  },
-  password: {
-    type: String,
-    required: true
-  },
-  accessToken: {
-    type: String,
-    default: () => crypto.randomBytes(128).toString('hex')
-  },
-  profileImage: {
-    name: String,
-    imageURL: String
-  },
-  friends: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  friendRequests: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  myFriendRequests: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }]
-})
-
+/*  Setting up mongoose models User, Thought, Feeling  */
 const User = mongoose.model('User', userSchema)
-
-const feelingSchema = mongoose.Schema({
-  value: Number,
-  description: String,
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-})
-
 const Feeling = mongoose.model('Feeling', feelingSchema)
-
-const thoughtSchema = mongoose.Schema({
-  message: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 5,
-    maxlength: 140
-  },
-  hugs: {
-    type: Number,
-    default: 0
-  },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  comments: [{
-    comment: {
-      type: String,
-      required: true,
-      trim: true,
-      minlength: 5,
-      maxlength: 140
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
-  }]
-})
-
 const Thought = mongoose.model('Thought', thoughtSchema)
 
 const authanticateUser = async (req, res, next) => {
@@ -152,10 +56,10 @@ const authanticateUser = async (req, res, next) => {
       req.user = user
       next()
     } else {
-      res.status(401).json({ sucess: false, message: 'Not authorized' })
+      res.status(401).json({ success: false, message: 'Not authorized' })
     }
   } catch (error) {
-    res.status(400).json({ sucess: false, message: 'Invalid request', error })
+    res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 }
 
@@ -165,9 +69,12 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+/* Endpoints start here */
 app.get('/', (req, res) => {
   res.send(listEndpoints(app))
 })
+
+/* Sign up and login endpoints */
 app.post('/googlelogin', async (req, res) => {
   const { tokenId } = req.body
   client.verifyIdToken({ idToken: tokenId, audience: `${process.env.GOOGLE_KEY}.apps.googleusercontent.com` })
@@ -176,6 +83,10 @@ app.post('/googlelogin', async (req, res) => {
       if (email_verified) {
         try {
           const user = await User.findOne({ email })
+            .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+            .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+            .populate({ path: 'friends', select: ['username', 'profileImage'] })
+            .exec()
           if (user) {
             res.json({
               success: true,
@@ -212,122 +123,6 @@ app.post('/googlelogin', async (req, res) => {
       }
     })
 })
-// Thought Endspoints starts here 
-app.get('/thoughts', async (req, res) => {
-  const { page, size } = req.query
-
-  const countAllThoughts = await Thought.countDocuments()
-
-  try {
-    const thoughts = await Thought
-      .find()
-      .populate({ path: 'user', select: ['username', 'profileImage'] })
-      .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
-      .sort({ createdAt: 'desc' })
-      .skip((page - 1) * size)
-      .limit(Number(size))
-      .exec()
-    res.json({
-      success: true,
-      thoughts,
-      totalPages: Math.ceil(countAllThoughts / size),
-      currenPage: page
-    })
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
-
-app.post('/thoughts', authanticateUser, async (req, res) => {
-  const { message } = req.body
-  const { _id } = req.user
-
-  try {
-    const newThought = await new Thought({
-      message,
-      user: _id
-    }).save()
-    if (newThought) {
-      res.json({
-        success: true,
-        thought: {
-          _id: newThought._id,
-          message: newThought.message,
-          createdAt: newThought.createdAt,
-          user: newThought.user,
-          hugs: newThought.hugs
-        }
-      })
-    } else {
-      res.status(404).json({ success: false, message: 'Could not post thought' })
-    }
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
-
-app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => {
-  const { thoughtId } = req.params
-  const { comment } = req.body
-  const { _id } = req.user
-
-  try {
-    const updatedThought = await Thought.findByIdAndUpdate(thoughtId, {
-      $push: {
-        comments: {
-          comment,
-          user: _id
-        }
-      }
-    }, {
-      new: true
-    })
-    if (updatedThought) {
-      res.json({
-        success: true,
-        thought: {
-          _id: updatedThought._id,
-          message: updatedThought.message,
-          createdAt: updatedThought.createdAt,
-          user: updatedThought.user,
-          hugs: updatedThought.hugs
-        }
-      })
-    } else {
-      res.status(404).json({ success: false, message: 'Could not comment post' })
-    }
-  } catch (error) {
-    res.status(400).json({ succes: false, message: 'Invalid request', error })
-  }
-})
-
-app.patch('/thoughts/:thoughtId/hug', async (req, res) => {
-  const { thoughtId } = req.params
-
-  try {
-    const updatedThought = await Thought.findByIdAndUpdate(
-      { _id: thoughtId },
-      { $inc: { hugs: 1 } },
-      { new: true }
-    )
-    if (updatedThought) {
-      res.json({
-        success: true,
-        thought: {
-          _id: updatedThought._id,
-          message: updatedThought.message,
-          createdAt: updatedThought.createdAt,
-          user: updatedThought.user,
-          hugs: updatedThought.hugs
-        }
-      })
-    } else {
-      res.status(404).json({ success: false, message: 'Could not like post' })
-    }
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
 
 app.post('/users', async (req, res) => {
   const { username, email, password } = req.body
@@ -350,115 +145,44 @@ app.post('/users', async (req, res) => {
       myFriendRequests: newUser.myFriendRequests
     })
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Could not create user',
-      error
+    res.status(400).json({ success: false, message: 'Could not create user', error })
+  }
+})
+
+app.post('/sessions', async (req, res) => {
+  const { emailOrUsername, password } = req.body
+  try {
+    const user = await User.findOne({
+      $or: [
+        { email: emailOrUsername },
+        { username: emailOrUsername }
+      ]
     })
-  }
-})
-
-app.get('/users', async (req, res) => {
-  try {
-    const users = await User.aggregate([
-      {
-        $unset: [
-          "password",
-          "accessToken",
-          "feelings",
-          "friends",
-          "friendRequests",
-          "myFriendRequests",
-          "email"
-        ]
-      }
-    ])
-    res.json(users)
-  } catch (error) {
-    res.status(400).json(error)
-  }
-})
-
-app.get('/users/:id', async (req, res) => {
-  const { id } = req.params
-  try {
-    const foundUser = await User.findById(id)
       .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
       .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
       .populate({ path: 'friends', select: ['username', 'profileImage'] })
       .exec()
-
-    if (foundUser) {
+    if (user && bcrypt.compareSync(password, user.password)) {
       res.json({
         success: true,
-        id: foundUser._id,
-        username: foundUser.username,
-        profileImage: foundUser.profileImage,
-        email: foundUser.email,
-        friends: foundUser.friends,
-        friendRequests: foundUser.friendRequests,
-        myFriendRequests: foundUser.myFriendRequests
-
+        // eslint-disable-next-line no-underscore-dangle
+        userId: user._id,
+        username: user.username,
+        accessToken: user.accessToken,
+        profileImage: user.profileImage,
+        friends: user.friends,
+        friendRequests: user.friendRequests,
+        myFriendRequests: user.myFriendRequests
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
     }
   } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
+    res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
 
-app.get('/feelings/:id', authanticateUser)
-app.get('/feelings/:id', async (req, res) => {
-  const { _id } = req.user
-
-  try {
-    const foundFeelings = await Feeling.find({ user: _id })
-    if (foundFeelings) {
-      res.json({
-        success: true,
-        feelings: foundFeelings
-      })
-    } else {
-      res.status(404).json({ success: false, message: 'Could not find users feelings' })
-    }
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
-
-app.get('/friendfeeling/:id', async (req, res) => {
-  const { id } = req.params
-
-  try {
-    const foundFeelings = await Feeling.find({ user: id })
-    if (foundFeelings) {
-      res.json({
-        success: true,
-        feelings: foundFeelings
-      })
-    } else {
-      res.status(404).json({ success: false, message: 'Could not find users feelings' })
-    }
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
-
-app.delete('/users/:id', async (req, res) => {
-  const { id } = req.params
-  try {
-    const deletedUser = await User.findByIdAndDelete(id)
-    if (deletedUser) {
-      res.json(deletedUser)
-    } else {
-      res.status(404).json('Could not delete the user')
-    }
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request', error })
-  }
-})
-
+/* update user account endpoints */
 app.patch('/users/:id/email', authanticateUser, async (req, res) => {
   const { id } = req.params
   const { email } = req.body
@@ -514,33 +238,14 @@ app.patch('/users/:id/password', authanticateUser, async (req, res) => {
   }
 })
 
-app.post('/sessions', async (req, res) => {
-  const { emailOrUsername, password } = req.body
+app.delete('/users/:id', async (req, res) => {
+  const { id } = req.params
   try {
-    const user = await User.findOne({
-      $or: [
-        { email: emailOrUsername },
-        { username: emailOrUsername }
-      ]
-    })
-      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
-      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
-      .populate({ path: 'friends', select: ['username', 'profileImage'] })
-      .exec()
-    if (user && bcrypt.compareSync(password, user.password)) {
-      res.json({
-        success: true,
-        // eslint-disable-next-line no-underscore-dangle
-        userId: user._id,
-        username: user.username,
-        accessToken: user.accessToken,
-        profileImage: user.profileImage,
-        friends: user.friends,
-        friendRequests: user.friendRequests,
-        myFriendRequests: user.myFriendRequests
-      })
+    const deletedUser = await User.findByIdAndDelete(id)
+    if (deletedUser) {
+      res.json({ success: true, deletedUser })
     } else {
-      res.status(404).json({ success: false, message: 'User not found' })
+      res.status(404).json({ success: false, message: 'Could not delete the user' })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
@@ -553,9 +258,97 @@ app.post('/users/:id/avatar', parser.single('image'), async (req, res) => {
     const avatar = await User.findByIdAndUpdate(id,
       { profileImage: { name: req.file.filename, imageURL: req.file.path } }, { new: true })
     if (avatar) {
-      res.json({ sucess: true, profileImage: avatar.profileImage })
+      res.json({ success: true, profileImage: avatar.profileImage })
     } else {
-      res.status(404).json({ sucess: false, message: 'Could not update picture' })
+      res.status(404).json({ success: false, message: 'Could not update picture' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+/* Enpoints to get information about users and user */
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $unset: [
+          "password",
+          "accessToken",
+          "feelings",
+          "friends",
+          "friendRequests",
+          "myFriendRequests",
+          "email"
+        ]
+      }
+    ])
+    res.json(users)
+  } catch (error) {
+    res.status(400).json(error)
+  }
+})
+
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const foundUser = await User.findById(id)
+      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'friends', select: ['username', 'profileImage'] })
+      .exec()
+
+    if (foundUser) {
+      res.json({
+        success: true,
+        id: foundUser._id,
+        username: foundUser.username,
+        profileImage: foundUser.profileImage,
+        email: foundUser.email,
+        friends: foundUser.friends,
+        friendRequests: foundUser.friendRequests,
+        myFriendRequests: foundUser.myFriendRequests
+
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'User not found' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+/* Feelings endpoints start here */
+app.get('/feelings/:id', authanticateUser)
+app.get('/feelings/:id', async (req, res) => {
+  const { _id } = req.user
+
+  try {
+    const foundFeelings = await Feeling.find({ user: _id })
+    if (foundFeelings) {
+      res.json({
+        success: true,
+        feelings: foundFeelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not find users feelings' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.get('/friendfeeling/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const foundFeelings = await Feeling.find({ user: id })
+    if (foundFeelings) {
+      res.json({
+        success: true,
+        feelings: foundFeelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not find users feelings' })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
@@ -586,19 +379,18 @@ app.post('/feelings', async (req, res) => {
         }
       )
     } else {
-      res.status(404).json({ message: 'Could not register feeling' })
+      res.status(404).json({ success: false, message: 'Could not register feeling' })
     }
   } catch (error) {
-    res.status(404).json({ message: 'Bad request', error })
+    res.status(404).json({ success: false, message: 'Bad request', error })
   }
 })
 
-// request a friend 
+/*  Friend request  */
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
   const { _id } = req.user
 
-  // eslint-disable-next-line no-console
   try {
     const friendRequest = await User.findByIdAndUpdate(id,
       { $push: { friendRequests: _id } },
@@ -674,7 +466,7 @@ app.put('/denyfriends', authanticateUser, async (req, res) => {
     const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
       { $pull: { myFriendRequests: _id } },
       { new: true })
-    
+
     const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
       { $pull: { friendRequests: id } },
       { new: true })
@@ -702,12 +494,12 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
   const { _id } = req.user
 
   try {
-    const unfollowedFriend = await User.findByIdAndUpdate(id, 
-      { $pull: { friends: _id } }, 
+    const unfollowedFriend = await User.findByIdAndUpdate(id,
+      { $pull: { friends: _id } },
       { new: true })
 
-    const meRemoved = await User.findByIdAndUpdate(_id, 
-      { $pull: { friends: id } }, 
+    const meRemoved = await User.findByIdAndUpdate(_id,
+      { $pull: { friends: id } },
       { new: true })
 
     if (unfollowedFriend && meRemoved) {
@@ -720,6 +512,123 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
         },
         message: `You are now NOT friend with ${unfollowedFriend.username}`
       })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+// Thought Endspoints starts here 
+app.get('/thoughts', async (req, res) => {
+  const { page, size } = req.query
+
+  const countAllThoughts = await Thought.countDocuments()
+
+  try {
+    const thoughts = await Thought
+      .find()
+      .populate({ path: 'user', select: ['username', 'profileImage'] })
+      .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
+      .sort({ createdAt: 'desc' })
+      .skip((page - 1) * size)
+      .limit(Number(size))
+      .exec()
+    res.json({
+      success: true,
+      thoughts,
+      totalPages: Math.ceil(countAllThoughts / size),
+      currenPage: page
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.post('/thoughts', authanticateUser, async (req, res) => {
+  const { message } = req.body
+  const { _id } = req.user
+
+  try {
+    const newThought = await new Thought({
+      message,
+      user: _id
+    }).save()
+    if (newThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: newThought._id,
+          message: newThought.message,
+          createdAt: newThought.createdAt,
+          user: newThought.user,
+          hugs: newThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not post thought' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => {
+  const { thoughtId } = req.params
+  const { comment } = req.body
+  const { _id } = req.user
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate(thoughtId, {
+      $push: {
+        comments: {
+          comment,
+          user: _id
+        }
+      }
+    }, {
+      new: true
+    })
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not comment post' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/hug', async (req, res) => {
+  const { thoughtId } = req.params
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate(
+      { _id: thoughtId },
+      { $inc: { hugs: 1 } },
+      { new: true }
+    )
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not like post' })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
