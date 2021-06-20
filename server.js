@@ -11,6 +11,8 @@ import cloudinaryFramework from 'cloudinary'
 import multer from 'multer'
 import cloudinaryStorage from 'multer-storage-cloudinary'
 import { OAuth2Client } from 'google-auth-library'
+import http from 'http'
+import socketIo from 'socket.io'
 
 import { userSchema } from './Schemas/user'
 import { feelingSchema } from './Schemas/feeling'
@@ -65,6 +67,33 @@ const authanticateUser = async (req, res, next) => {
 
 const port = process.env.PORT || 8080
 const app = express()
+const server = http.createServer(app)
+const io = socketIo(server, {
+  cors: {
+    origin: "*"
+  }  
+})
+
+io.on("connection", (socket) => {
+  console.log("Made socket connection", socket.id)
+
+  socket.on("sendnotification", (data) => {
+    // data.username.map((item) => item.username)
+    console.log('add', data)
+    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username))
+    io.emit("post", 'I want do add you')
+  })
+
+  // socket.on("remove", (data) => {
+  //   // data.username.map((item) => item.username)
+  //   console.log('remove', data)
+  //   io.to(socket.id).emit("delete", data.username.map((item) => item.username))
+  // })
+
+  socket.on("disconnect", () => {
+    console.log("Made socket disconnected")
+  })
+})
 
 app.use(cors())
 app.use(express.json())
