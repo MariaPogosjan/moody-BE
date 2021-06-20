@@ -127,16 +127,11 @@ io.on("connection", (socket) => {
 
   socket.on("sendnotification", (data) => {
     // data.username.map((item) => item.username)
-    console.log('add', data)
-    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username))
-    io.emit("post", 'I want do add you')
+    console.log('add', data.username)
+    // eslint-disable-next-line no-console
+    io.to(socket.id).emit("newnotification", data.username.map((item) => item))
+    // io.emit("post", 'I want do add you')
   })
-
-  // socket.on("remove", (data) => {
-  //   // data.username.map((item) => item.username)
-  //   console.log('remove', data)
-  //   io.to(socket.id).emit("delete", data.username.map((item) => item.username))
-  // })
 
   socket.on("disconnect", () => {
     console.log("Made socket disconnected")
