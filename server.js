@@ -125,16 +125,22 @@ const io = socketIo(server, {
 io.on("connection", (socket) => {
   console.log("Made socket connection", socket.id)
 
+  socket.on("sendnotification", (data) => {
+    // data.username.map((item) => item.username)
+    console.log('add', data)
+    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username))
+  })
+
+  // socket.on("remove", (data) => {
+  //   // data.username.map((item) => item.username)
+  //   console.log('remove', data)
+  //   io.to(socket.id).emit("delete", data.username.map((item) => item.username))
+  // })
+
   socket.on("disconnect", () => {
     console.log("Made socket disconnected")
   })
-
-  socket.on("sendnotification", (data) => {
-    // data.username.map((item) => item.username)
-    io.to(socket.id).emit("newnotification", data.username.map((item) => item.username));
-  })
 })
-
 // let users = []
 
 // const addUser = (userId, socketId) => {
