@@ -96,6 +96,47 @@ const feelingSchema = mongoose.Schema({
 
 const Feeling = mongoose.model('Feeling', feelingSchema)
 
+const thoughtSchema = mongoose.Schema({
+  message: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 5,
+    maxlength: 140
+  },
+  hugs: {
+    type: Number,
+    default: 0
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  comments: [{
+    comment: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 5,
+      maxlength: 140
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }]
+})
+
+const Thought = mongoose.model('Thought', thoughtSchema)
+
 const authanticateUser = async (req, res, next) => {
   const accessToken = req.header('Authorization')
   try {
@@ -121,6 +162,123 @@ app.get('/', (req, res) => {
   res.send(listEndpoints(app))
 })
 
+// Thought Endspoints starts here 
+app.get('/thoughts', async (req, res) => {
+  const { page, size } = req.query
+
+  const countAllThoughts = await Thought.countDocuments()
+  
+  try {
+    const thoughts = await Thought
+      .find()
+      .populate({ path: 'user', select: ['username', 'profileImage'] })
+      .populate({ path: 'comments', populate: { path: 'user', select: 'username' } })
+      .sort({ createdAt: 'desc' })
+      .skip((page - 1) * size)
+      .limit(Number(size))
+      .exec()
+    res.json({ 
+      success: true, 
+      thoughts,
+      totalPages: Math.ceil(countAllThoughts / size),
+      currenPage: page
+    })
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.post('/thoughts', authanticateUser, async (req, res) => {
+  const { message } = req.body
+  const { _id } = req.user
+
+  try {
+    const newThought = await new Thought({
+      message,
+      user: _id
+    }).save()
+    if (newThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: newThought._id,
+          message: newThought.message,
+          createdAt: newThought.createdAt,
+          user: newThought.user,
+          hugs: newThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not post thought' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => {
+  const { thoughtId } = req.params
+  const { comment } = req.body
+  const { _id } = req.user
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate(thoughtId, {
+      $push: { 
+        comments: { 
+          comment, 
+          user: _id
+        }
+      }
+    }, {
+      new: true
+    }) 
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not comment post' })
+    }
+  } catch (error) {
+    res.status(400).json({ succes: false, message: 'Invalid request', error })
+  }
+})
+
+app.patch('/thoughts/:thoughtId/hug', async (req, res) => {
+  const { thoughtId } = req.params
+
+  try {
+    const updatedThought = await Thought.findByIdAndUpdate(
+      { _id: thoughtId },
+      { $inc: { hugs: 1 } },
+      { new: true }
+    )
+    if (updatedThought) {
+      res.json({
+        success: true,
+        thought: {
+          _id: updatedThought._id,
+          message: updatedThought.message,
+          createdAt: updatedThought.createdAt,
+          user: updatedThought.user,
+          hugs: updatedThought.hugs
+        }
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not like post' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
 app.post('/users', async (req, res) => {
   const { username, email, password } = req.body
   try {
@@ -136,7 +294,10 @@ app.post('/users', async (req, res) => {
       userId: newUser._id,
       username: newUser.username,
       accessToken: newUser.accessToken,
-      profileImage: newUser.profileImage
+      profileImage: newUser.profileImage,
+      friends: newUser.friends,
+      friendRequests: newUser.friendRequests,
+      myFriendRequests: newUser.myFriendRequests
     })
   } catch (error) {
     res.status(400).json({
@@ -154,6 +315,10 @@ app.get('/users', async (req, res) => {
         $unset: [
           "password",
           "accessToken",
+          "feelings",
+          "friends",
+          "friendRequests",
+          "myFriendRequests",
           "email"
         ]
       }
@@ -168,14 +333,22 @@ app.get('/users/:id', async (req, res) => {
   const { id } = req.params
   try {
     const foundUser = await User.findById(id)
+      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'friends', select: ['username', 'profileImage'] })
+      .exec()
+
     if (foundUser) {
       res.json({
         success: true,
         id: foundUser._id,
         username: foundUser.username,
+        profileImage: foundUser.profileImage,
         email: foundUser.email,
-        followers: foundUser.followers,
-        following: foundUser.following
+        friends: foundUser.friends,
+        friendRequests: foundUser.friendRequests,
+        myFriendRequests: foundUser.myFriendRequests
+
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -191,6 +364,24 @@ app.get('/feelings/:id', async (req, res) => {
 
   try {
     const foundFeelings = await Feeling.find({ user: _id })
+    if (foundFeelings) {
+      res.json({
+        success: true,
+        feelings: foundFeelings
+      })
+    } else {
+      res.status(404).json({ success: false, message: 'Could not find users feelings' })
+    }
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid request', error })
+  }
+})
+
+app.get('/friendfeeling/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const foundFeelings = await Feeling.find({ user: id })
     if (foundFeelings) {
       res.json({
         success: true,
@@ -300,6 +491,10 @@ app.post('/sessions', async (req, res) => {
         { username: emailOrUsername }
       ]
     })
+      .populate({ path: 'friendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'myFriendRequests', select: ['username', 'profileImage'] })
+      .populate({ path: 'friends', select: ['username', 'profileImage'] })
+      .exec()
     if (user && bcrypt.compareSync(password, user.password)) {
       res.json({
         success: true,
@@ -307,7 +502,10 @@ app.post('/sessions', async (req, res) => {
         userId: user._id,
         username: user.username,
         accessToken: user.accessToken,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        friends: user.friends,
+        friendRequests: user.friendRequests,
+        myFriendRequests: user.myFriendRequests
       })
     } else {
       res.status(404).json({ success: false, message: 'User not found' })
@@ -363,7 +561,6 @@ app.post('/feelings', async (req, res) => {
   }
 })
 
-
 // request a friend 
 app.put('/follow', authanticateUser, async (req, res) => {
   const { id } = req.body
@@ -391,7 +588,15 @@ app.put('/follow', authanticateUser, async (req, res) => {
     })
 
     if (friendRequest && myFriendRequest) {
-      res.json({ success: true, message: `You have requested to be friends with ${friendRequest._id}` })
+      res.json({
+        success: true,
+        friend: {
+          _id: friendRequest._id,
+          username: friendRequest.username,
+          profileImage: friendRequest.profileImage
+        },
+        message: `You have requested to be friends with ${friendRequest.username}`
+      })
     } else {
       res.status(404).json({ sucess: false, message: 'Could not request friendship!' })
     }
@@ -405,7 +610,7 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
   const { _id } = req.user
 
   try {
-    const myFriendAdded = await User.findByIdAndUpdate(id,
+    const meAddedToFriend = await User.findByIdAndUpdate(id,
       {
         $push: {
           // eslint-disable-next-line no-undef
@@ -415,16 +620,16 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const myFriendRemoved = await User.findByIdAndUpdate(id,
+    const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
       {
         $pull: {
-          friendRequests: _id
+          myFriendRequests: _id
         }
       },
       {
         new: true
       })
-    const meAdded = await User.findByIdAndUpdate(_id,
+    const friendAddedAsFriend = await User.findByIdAndUpdate(_id,
       {
         $push: {
           friends: id
@@ -433,17 +638,69 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
       {
         new: true
       })
-    const meRemoved = await User.findByIdAndUpdate(_id,
+    const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
       {
         $pull: {
-          friends: id
+          friendRequests: id
         }
       },
       {
         new: true
       })
-    if (myFriendAdded && myFriendRemoved && meAdded && meRemoved) {
-      res.json({ success: true, message: `You are now friend with ${myFriendAdded._id}` })
+    if (meAddedToFriend && meRemovedFromFriendRequest && friendAddedAsFriend && friendRemovedFromMyRequest) {
+      res.json({
+        success: true,
+        friend: {
+          _id: meAddedToFriend._id,
+          username: meAddedToFriend.username,
+          profileImage: meAddedToFriend.profileImage
+        },
+        message: `You are now friend with ${meAddedToFriend.username}`
+      })
+    } else {
+      res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Invalid request', error })
+  }
+})
+
+
+app.put('/denyfriends', authanticateUser, async (req, res) => {
+  const { id } = req.body
+  const { _id } = req.user
+
+  try {
+
+    const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
+      {
+        $pull: {
+          myFriendRequests: _id
+        }
+      },
+      {
+        new: true
+      })
+    const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
+      {
+        $pull: {
+          friendRequests: id
+        }
+      },
+      {
+        new: true
+      })
+    if (meRemovedFromFriendRequest && friendRemovedFromMyRequest) {
+      res.json({
+        success: true,
+        friend: {
+          _id: meRemovedFromFriendRequest._id,
+          username: meRemovedFromFriendRequest.username,
+          profileImage: meRemovedFromFriendRequest.profileImage
+        },
+        message: `You denied friendship with ${meRemovedFromFriendRequest.username}`
+      })
+
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
@@ -474,13 +731,20 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
     })
 
     if (unfollowedFriend && meRemoved) {
-      res.json({ success: true, message: `You are now NOT friend with ${unfollowedFriend._id}` })
+      res.json({
+        success: true,
+        friend: {
+          _id: unfollowedFriend._id,
+          username: unfollowedFriend.username,
+          profileImage: unfollowedFriend.profileImage
+        },
+        message: `You are now NOT friend with ${unfollowedFriend.username}`
+      })
     }
   } catch (error) {
     res.status(400).json({ success: false, message: 'Invalid request', error })
   }
 })
-
 
 // Start the server here
 app.listen(port, () => {
