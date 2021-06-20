@@ -129,6 +129,7 @@ io.on("connection", (socket) => {
     // data.username.map((item) => item.username)
     console.log('add', data)
     io.to(socket.id).emit("newnotification", data.username.map((item) => item.username))
+    io.emit("post", 'I want do add you')
   })
 
   // socket.on("remove", (data) => {
