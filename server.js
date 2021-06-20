@@ -1,3 +1,6 @@
+/* eslint-disable no-useless-escape */
+/* eslint-disable no-underscore-dangle */
+/* eslint-disable camelcase */
 import express from 'express'
 import cors from 'cors'
 import mongoose from 'mongoose'
@@ -8,6 +11,10 @@ import dotenv from 'dotenv'
 import cloudinaryFramework from 'cloudinary'
 import multer from 'multer'
 import cloudinaryStorage from 'multer-storage-cloudinary'
+
+import { OAuth2Client } from 'google-auth-library'
+
+const client = new OAuth2Client(process.env.GOOGLE_KEY)
 
 dotenv.config()
 const cloudinary = cloudinaryFramework.v2;
@@ -36,7 +43,7 @@ const userSchema = mongoose.Schema({
     type: String,
     required: true,
     minlength: 5,
-    maxlength: 12,
+    maxlength: 35,
     unique: true,
     lowercase: true,
     trim: true
@@ -161,13 +168,56 @@ app.use(express.json())
 app.get('/', (req, res) => {
   res.send(listEndpoints(app))
 })
-
+app.post('/googlelogin', async (req, res) => {
+  const { tokenId } = req.body
+  client.verifyIdToken({ idToken: tokenId, audience: `${process.env.GOOGLE_KEY}.apps.googleusercontent.com` })
+    .then(async (response) => {
+      const { email_verified, email } = response.payload
+      if (email_verified) {
+        try {
+          const user = await User.findOne({ email })
+          if (user) {
+            res.json({
+              success: true,
+              userId: user._id,
+              username: user.username,
+              accessToken: user.accessToken,
+              profileImage: user.profileImage,
+              friends: user.friends,
+              friendRequests: user.friendRequests,
+              myFriendRequests: user.myFriendRequests
+            })
+          } else {
+            const salt = bcrypt.genSaltSync()
+            const password = bcrypt.hashSync(email, salt)
+            const newUser = await new User({
+              username: email,
+              email,
+              password
+            }).save()
+            res.json({
+              success: true,
+              userId: newUser._id,
+              username: newUser.username,
+              accessToken: newUser.accessToken,
+              profileImage: newUser.profileImage,
+              friends: newUser.friends,
+              friendRequests: newUser.friendRequests,
+              myFriendRequests: newUser.myFriendRequests
+            })
+          }
+        } catch (error) {
+          res.status(400).json({ success: false, message: "Something went wrong", error })
+        }
+      }
+    })
+})
 // Thought Endspoints starts here 
 app.get('/thoughts', async (req, res) => {
   const { page, size } = req.query
 
   const countAllThoughts = await Thought.countDocuments()
-  
+
   try {
     const thoughts = await Thought
       .find()
@@ -177,8 +227,8 @@ app.get('/thoughts', async (req, res) => {
       .skip((page - 1) * size)
       .limit(Number(size))
       .exec()
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       thoughts,
       totalPages: Math.ceil(countAllThoughts / size),
       currenPage: page
@@ -223,15 +273,15 @@ app.patch('/thoughts/:thoughtId/comment', authanticateUser, async (req, res) => 
 
   try {
     const updatedThought = await Thought.findByIdAndUpdate(thoughtId, {
-      $push: { 
-        comments: { 
-          comment, 
+      $push: {
+        comments: {
+          comment,
           user: _id
         }
       }
     }, {
       new: true
-    }) 
+    })
     if (updatedThought) {
       res.json({
         success: true,
@@ -414,14 +464,8 @@ app.patch('/users/:id/email', authanticateUser, async (req, res) => {
   const { email } = req.body
   try {
     const updatedUser = await User.findByIdAndUpdate(id,
-      {
-        $set: {
-          email
-        }
-      },
-      {
-        new: true
-      })
+      { $set: { email } },
+      { new: true })
     res.json({
       success: true,
       email: updatedUser.email
@@ -436,14 +480,8 @@ app.patch('/users/:id/username', authanticateUser, async (req, res) => {
   const { username } = req.body
   try {
     const updatedUser = await User.findByIdAndUpdate(id,
-      {
-        $set: {
-          username
-        }
-      },
-      {
-        new: true
-      })
+      { $set: { username } },
+      { new: true })
     res.json({
       success: true,
       username: updatedUser.username
@@ -462,14 +500,8 @@ app.patch('/users/:id/password', authanticateUser, async (req, res) => {
 
     if (user && bcrypt.compareSync(password, user.password)) {
       const updatedUser = await User.findByIdAndUpdate(id,
-        {
-          $set: {
-            password: bcrypt.hashSync(newPassword, salt)
-          }
-        },
-        {
-          new: true
-        })
+        { $set: { password: bcrypt.hashSync(newPassword, salt) } },
+        { new: true })
       res.json({
         success: true,
         message: `${updatedUser.username}: password updated successfully!`
@@ -569,23 +601,12 @@ app.put('/follow', authanticateUser, async (req, res) => {
   // eslint-disable-next-line no-console
   try {
     const friendRequest = await User.findByIdAndUpdate(id,
-      {
-        $push: {
-          // eslint-disable-next-line no-undef
-          friendRequests: _id
-        }
-      }, {
-      new: true
-    })
+      { $push: { friendRequests: _id } },
+      { new: true })
 
     const myFriendRequest = await User.findByIdAndUpdate(_id,
-      {
-        $push: {
-          myFriendRequests: id
-        }
-      }, {
-      new: true
-    })
+      { $push: { myFriendRequests: id } },
+      { new: true })
 
     if (friendRequest && myFriendRequest) {
       res.json({
@@ -611,42 +632,22 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
 
   try {
     const meAddedToFriend = await User.findByIdAndUpdate(id,
-      {
-        $push: {
-          // eslint-disable-next-line no-undef
-          friends: _id
-        }
-      },
-      {
-        new: true
-      })
+      { $push: { friends: _id } },
+      { new: true })
+
     const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
-      {
-        $pull: {
-          myFriendRequests: _id
-        }
-      },
-      {
-        new: true
-      })
+      { $pull: { myFriendRequests: _id } },
+      { new: true })
+
     const friendAddedAsFriend = await User.findByIdAndUpdate(_id,
-      {
-        $push: {
-          friends: id
-        }
-      },
-      {
-        new: true
-      })
+      { $push: { friends: id } },
+      { new: true })
+
     const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
-      {
-        $pull: {
-          friendRequests: id
-        }
-      },
-      {
-        new: true
-      })
+      { $pull: { friendRequests: id } },
+      { new: true })
+
+    // eslint-disable-next-line max-len
     if (meAddedToFriend && meRemovedFromFriendRequest && friendAddedAsFriend && friendRemovedFromMyRequest) {
       res.json({
         success: true,
@@ -665,31 +666,19 @@ app.put('/acceptfriends', authanticateUser, async (req, res) => {
   }
 })
 
-
 app.put('/denyfriends', authanticateUser, async (req, res) => {
   const { id } = req.body
   const { _id } = req.user
 
   try {
-
     const meRemovedFromFriendRequest = await User.findByIdAndUpdate(id,
-      {
-        $pull: {
-          myFriendRequests: _id
-        }
-      },
-      {
-        new: true
-      })
+      { $pull: { myFriendRequests: _id } },
+      { new: true })
+    
     const friendRemovedFromMyRequest = await User.findByIdAndUpdate(_id,
-      {
-        $pull: {
-          friendRequests: id
-        }
-      },
-      {
-        new: true
-      })
+      { $pull: { friendRequests: id } },
+      { new: true })
+
     if (meRemovedFromFriendRequest && friendRemovedFromMyRequest) {
       res.json({
         success: true,
@@ -700,7 +689,6 @@ app.put('/denyfriends', authanticateUser, async (req, res) => {
         },
         message: `You denied friendship with ${meRemovedFromFriendRequest.username}`
       })
-
     } else {
       res.status(404).json({ sucess: false, message: 'Could not accept friendship!' })
     }
@@ -714,21 +702,13 @@ app.patch('/unfollow', authanticateUser, async (req, res) => {
   const { _id } = req.user
 
   try {
-    const unfollowedFriend = await User.findByIdAndUpdate(id, {
-      $pull: {
-        friends: _id
-      }
-    }, {
-      new: true
-    })
+    const unfollowedFriend = await User.findByIdAndUpdate(id, 
+      { $pull: { friends: _id } }, 
+      { new: true })
 
-    const meRemoved = await User.findByIdAndUpdate(_id, {
-      $pull: {
-        friends: id
-      }
-    }, {
-      new: true
-    })
+    const meRemoved = await User.findByIdAndUpdate(_id, 
+      { $pull: { friends: id } }, 
+      { new: true })
 
     if (unfollowedFriend && meRemoved) {
       res.json({
