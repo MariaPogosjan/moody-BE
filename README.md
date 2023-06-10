@@ -50,6 +50,6 @@ Moody is an app where users can track their feelings over time (daily, weekly, m
 
 ## View live
 
-Netlify: https://fervent-heisenberg-ee175b.netlify.app/ \
+Netlify:https://polite-griffin-ef5047.netlify.app/ \
 
-Heroku: https://moody-bee.herokuapp.com \
+Heroku: https://moody-be-77tqxxowdq-lz.a.run.app \
